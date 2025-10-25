@@ -1,0 +1,78 @@
+﻿@{
+    ViewData["Title"] = "Agent Dashboard";
+}
+
+<h2>Agent Dashboard</h2>
+
+<div style="margin-top:20px;">
+    <label>AgentId:</label>
+    <input type="text" id="AgentId" style="width:200px; margin-left:10px;" />
+    <button id="connectBtn" type="button">Connect</button>
+</div>
+
+<div style="margin-top:20px;">
+    <label>Incoming Call Number:</label>
+    <input type="text" id="callNumber" readonly style="width:200px; margin-left:10px;" />
+</div>
+
+<div style="margin-top:20px;">
+    <button id="answerBtn" type="button" disabled>Answer</button>
+    <button id="endBtn" type="button" disabled>End Call</button>
+    <button id="simulateBtn" type="button">Simulate Call</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@9.0.6/dist/browser/signalr.min.js"></script>
+<script>
+    let connection;
+    let currentAgentId = ""; 
+
+    document.getElementById("connectBtn").addEventListener("click", async() => {
+ 
+        const agentId = document.getElementById("AgentId").value.trim();
+        if(connection){
+            await connection.invoke("DisconnectAgent", currentAgentId);
+            await connection.stop();
+        }
+        connection = new signalR.HubConnectionBuilder().withUrl("/callHub").build();
+        currentAgentId = agentId;
+        connection.start().then(() => {
+            connection.invoke("RegisterAgent", agentId);
+            console.log(`Agent ${agentId} registered`);
+            setupListeners();
+        }).catch(err => console.error(err.toString()));
+    });
+     function setupListeners() {
+    connection.on("ReceiveCall", (phoneNumber) => {
+        document.getElementById("callNumber").value = phoneNumber;
+        document.getElementById("answerBtn").disabled = false;
+    });}
+
+    // Answer Call
+    document.getElementById("answerBtn").addEventListener("click", () => {
+        const agentId = document.getElementById("AgentId").value.trim();
+        connection.invoke("UpdateStatus", agentId, "busy");
+        document.getElementById("answerBtn").disabled = true;
+        document.getElementById("endBtn").disabled = false;
+    });
+
+   
+    document.getElementById("endBtn").addEventListener("click", () => {
+        const agentId = document.getElementById("AgentId").value.trim();
+        connection.invoke("UpdateStatus", agentId, "avaliable");
+        document.getElementById("callNumber").value = "";
+        document.getElementById("endBtn").disabled = true;
+        document.getElementById("answerBtn").disabled = true;
+    });
+
+   
+    document.getElementById("simulateBtn").addEventListener("click", async () => {
+        const agentId = document.getElementById("AgentId").value.trim();
+        if (!agentId) {
+            alert("Please enter AgentId");
+            return;
+        }
+        const response = await fetch(`/Call/SimulateCall?agentId=${agentId}`);
+        const text = await response.text();
+        console.log(text);
+    });
+</script>
